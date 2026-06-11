@@ -8,7 +8,7 @@ export default function Forms() {
   const navigate = useNavigate();
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full min-w-0 overflow-x-hidden">
       <div className="mb-8">
         <h1 className="text-2xl font-display font-bold text-foreground">Forms</h1>
         <p className="text-muted-foreground mt-1">

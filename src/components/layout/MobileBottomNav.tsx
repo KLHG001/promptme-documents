@@ -21,7 +21,7 @@ export function MobileBottomNav() {
       className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-safe"
       aria-label="Main navigation"
     >
-      <div className="flex items-stretch justify-around max-w-[100vw]">
+      <div className="flex items-stretch justify-around w-full max-w-full">
         {items.map((item) => (
           <NavLink
             key={item.url}

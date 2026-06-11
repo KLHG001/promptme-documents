@@ -514,7 +514,7 @@ export default function SovereignVault() {
             </div>
             <div>
               <h1 className="text-xl font-serif font-bold text-foreground">Sovereign Vault</h1>
-              <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none">
+              <p className="text-xs text-muted-foreground truncate max-w-full sm:max-w-none">
                 {currentFolderPath === "/" ? "All properties" : currentFolderPath}
               </p>
             </div>

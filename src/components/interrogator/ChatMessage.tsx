@@ -18,7 +18,7 @@ export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
-        "flex gap-3 max-w-[90%]",
+        "flex gap-3 max-w-[90%] min-w-0",
         isAi ? "self-start" : "self-end flex-row-reverse ml-auto"
       )}
     >
@@ -35,7 +35,7 @@ export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
 
       <div
         className={cn(
-          "rounded-2xl px-4 py-3 text-sm leading-relaxed",
+          "rounded-2xl px-4 py-3 text-sm leading-relaxed min-w-0 max-w-full break-words overflow-hidden",
           isAi
             ? "bg-card text-card-foreground border border-border"
             : "bg-primary text-primary-foreground",
@@ -46,7 +46,7 @@ export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
           <AlertCircle className="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" />
         )}
         {isAi ? (
-          <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:m-0 [&>ul]:mt-1 [&>ol]:mt-1 font-sans">
+          <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:m-0 [&>ul]:mt-1 [&>ol]:mt-1 font-sans break-words overflow-x-auto">
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         ) : (

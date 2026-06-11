@@ -215,7 +215,7 @@ export default function ChatHistory() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-w-0 max-w-full overflow-x-hidden">
       <div className="px-4 py-3 border-b border-border bg-primary/5 flex items-center gap-3">
         <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
         <History className="w-5 h-5 text-primary" />
@@ -254,7 +254,7 @@ export default function ChatHistory() {
       )}
 
       <ScrollArea className={viewingSession ? "h-48 shrink-0" : "flex-1"}>
-        <div className="p-4 max-w-3xl mx-auto space-y-3">
+        <div className="p-4 max-w-3xl mx-auto w-full min-w-0 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

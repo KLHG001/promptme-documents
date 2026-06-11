@@ -175,7 +175,7 @@ export default function Contacts() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contacts</h1>
@@ -192,7 +192,7 @@ export default function Contacts() {
               <DialogTitle>{editingId ? "Edit Contact" : "New Contact"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-2">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Name *</Label>
                   <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Display name" />
@@ -202,7 +202,7 @@ export default function Contacts() {
                   <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Legal / full name" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select value={form.contact_type} onValueChange={(v) => setForm({ ...form, contact_type: v })}>
@@ -222,7 +222,7 @@ export default function Contacts() {
                   <Input value={form.contact_title} onChange={(e) => setForm({ ...form, contact_title: e.target.value })} placeholder="e.g. Manager" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Email</Label>
                   <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
@@ -232,7 +232,7 @@ export default function Contacts() {
                   <Input type="email" value={form.email_secondary} onChange={(e) => setForm({ ...form, email_secondary: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Phone</Label>
                   <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -254,7 +254,7 @@ export default function Contacts() {
                 <Label>Address</Label>
                 <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Account #</Label>
                   <Input value={form.account_number} onChange={(e) => setForm({ ...form, account_number: e.target.value })} />
@@ -281,7 +281,7 @@ export default function Contacts() {
           <Input className="pl-9" placeholder="Search contacts..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All types" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-40 max-w-full"><SelectValue placeholder="All types" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="personal">Personal</SelectItem>
@@ -312,7 +312,7 @@ export default function Contacts() {
                   <TableHead className="hidden md:table-cell">Email</TableHead>
                   <TableHead className="hidden md:table-cell">Phone</TableHead>
                   <TableHead className="hidden lg:table-cell">Business</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-24 sm:w-28">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

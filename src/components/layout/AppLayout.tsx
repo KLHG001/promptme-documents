@@ -33,18 +33,18 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full max-w-[100vw] overflow-x-hidden bg-background">
+      <div className="min-h-screen flex w-full max-w-full overflow-x-hidden bg-background">
         <AppSidebar />
 
         <div className="flex-1 flex flex-col min-h-screen min-w-0 pb-bottom-nav md:pb-0">
           {/* Top bar - hidden on chat route */}
           {!isChatRoute && (
-            <header className="h-12 flex items-center justify-between border-b border-border px-4 bg-card">
-              <div className="flex items-center gap-3">
-                <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-                {/* Mood & Alter Ego strip */}
+            <header className="h-12 flex items-center justify-between border-b border-border px-3 sm:px-4 bg-card min-w-0 overflow-hidden gap-2 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
+                <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
+                {/* Mood & Alter Ego strip — hidden on narrow phones to prevent header overflow */}
                 {checkinMood != null && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                     <Sun className="w-3 h-3" />
                     <span className="font-medium">{checkinMood ?? "—"}/10</span>
                     <span className="text-border">|</span>
@@ -53,7 +53,7 @@ export function AppLayout() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <ModeToggle compact />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

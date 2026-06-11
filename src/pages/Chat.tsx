@@ -197,7 +197,7 @@ export default function Chat() {
             disabled={isTyping}
             placeholder="Speak or type what you need…"
             voicePrimary
-            className="pl-14"
+            className="pl-12 sm:pl-14"
           />
         </div>
         <Button

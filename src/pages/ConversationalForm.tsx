@@ -10,7 +10,7 @@ export default function ConversationalForm() {
   const { messages, isTyping, sendMessage, reset } = useInterrogator();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-w-0 max-w-full overflow-x-hidden">
       {/* Header bar */}
       <div className="px-4 py-3 border-b border-border bg-card/50 flex items-center justify-between">
         <div>

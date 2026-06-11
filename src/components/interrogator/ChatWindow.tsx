@@ -18,8 +18,8 @@ export function ChatWindow({ messages, isTyping, showAvatars = true }: ChatWindo
   }, [messages, isTyping]);
 
   return (
-    <ScrollArea className="flex-1 px-4 py-4">
-      <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+    <ScrollArea className="flex-1 px-4 py-4 min-w-0">
+      <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full min-w-0">
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} showAvatar={showAvatars} />
         ))}

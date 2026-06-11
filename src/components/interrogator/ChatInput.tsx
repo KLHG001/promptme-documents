@@ -191,7 +191,7 @@ export function ChatInput({
                 className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground border border-border"
               >
                 <Paperclip className="w-3 h-3 flex-shrink-0" />
-                <span className="max-w-[120px] truncate">{file.name}</span>
+                <span className="max-w-[min(120px,40vw)] truncate">{file.name}</span>
                 <button
                   type="button"
                   onClick={() => removeFile(i)}
@@ -204,7 +204,7 @@ export function ChatInput({
           </div>
         )}
 
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1.5 sm:gap-2 min-w-0 w-full">
           <Button
             type="button"
             variant={voicePrimary ? "default" : "ghost"}

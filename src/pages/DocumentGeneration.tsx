@@ -23,6 +23,7 @@ import { FieldWalker, fieldEncouragement } from "@/components/fields/FieldWalker
 import { ScribeTemplateChat } from "@/components/scribe/ScribeTemplateChat";
 import type { WalkableField } from "@/hooks/useFieldWalker";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
 import { SaveToVaultDialog } from "@/components/vault/SaveToVaultDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -413,6 +414,12 @@ export default function DocumentGeneration() {
           </div>
         </Card>
 
+        {savingVault && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
+            <ProcessingIndicator message="Saving to Vault…" submessage={activeTemplate?.name} />
+          </div>
+        )}
+
         <SaveToVaultDialog
           open={vaultDialogOpen}
           onOpenChange={setVaultDialogOpen}
@@ -433,7 +440,7 @@ export default function DocumentGeneration() {
   }
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-5 overflow-hidden bg-background">
+    <div className="flex flex-col h-full min-w-0 max-w-full p-4 sm:p-6 gap-5 overflow-hidden bg-background">
       <header className="flex items-center justify-between shrink-0 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center border border-primary/30">

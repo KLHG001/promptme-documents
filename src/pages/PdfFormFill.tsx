@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Upload, FileText, Download, Save, RotateCcw, CheckCircle2, FolderOpen } from "lucide-react";
+import { Upload, Download, Save, RotateCcw, CheckCircle2, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FieldWalker, fieldEncouragement } from "@/components/fields/FieldWalker";
@@ -10,18 +10,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
 import { SaveToVaultDialog } from "@/components/vault/SaveToVaultDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { saveToVault } from "@/lib/vaultStorage";
 import { awardCoins } from "@/lib/masterVault/coins";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabaseEnv";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/hooks/useInterrogator";
 
-type Stage = "upload" | "preview" | "parsing" | "fill" | "filling" | "done";
+type Stage = "upload" | "reading" | "parsing" | "fill" | "filling" | "done";
 
-const PARSE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-parse-fields`;
-const FILL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pdf-fill-fields`;
+const PARSE_URL = `${getSupabaseUrl()}/functions/v1/pdf-parse-fields`;
+const FILL_URL = `${getSupabaseUrl()}/functions/v1/pdf-fill-fields`;
+const MAX_PDF_BYTES = 5 * 1024 * 1024;
+const PROCESS_TIMEOUT_MS = 30_000;
 
 interface LocationState {
   templateFields?: Array<{
@@ -73,6 +77,8 @@ export default function PdfFormFill() {
     variant?: "success" | "error" | "info";
   }>({ open: false, title: "" });
   const fillKeyRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (locationState?.templateFields?.length) {
@@ -86,82 +92,116 @@ export default function PdfFormFill() {
     }
   }, [locationState?.templateFields, locationState?.templateName]);
 
-  const readFileAsBase64 = (file: File): Promise<string> =>
+  const readFileAsBase64 = (file: File, onProgress?: (pct: number) => void): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
       reader.onload = () => {
         const result = reader.result as string;
         resolve(result.split(",")[1]);
       };
-      reader.onerror = reject;
+      reader.onerror = () => reject(new Error("Could not read the file."));
       reader.readAsDataURL(file);
     });
 
+  const showUploadFailed = (description?: string) => {
+    setFeedback({
+      open: true,
+      title: "Upload failed",
+      description: description ?? "Try again or use a smaller file (under 5 MB).",
+      variant: "error",
+    });
+  };
+
   const handleFile = useCallback(async (file: File) => {
-    if (file.type !== "application/pdf") {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setFeedback({ open: true, title: "PDF only", description: "Please upload a PDF file.", variant: "error" });
       return;
     }
-    if (file.size > 20 * 1024 * 1024) {
-      setFeedback({ open: true, title: "File too large", description: "Maximum size is 20 MB.", variant: "error" });
+    if (file.size > MAX_PDF_BYTES) {
+      setFeedback({
+        open: true,
+        title: "File too large",
+        description: "Maximum size is 5 MB so we can detect fields reliably.",
+        variant: "error",
+      });
       return;
     }
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), PROCESS_TIMEOUT_MS);
+
     setFileName(file.name);
     setTemplateName(file.name.replace(/\.pdf$/i, ""));
+    setStage("reading");
 
     try {
       const base64 = await readFileAsBase64(file);
       setPdfBase64(base64);
-      setStage("preview");
+      setStage("parsing");
 
-      setTimeout(async () => {
-        setStage("parsing");
-        try {
-          const resp = await fetch(PARSE_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({ pdfBase64: base64 }),
-          });
+      const anonKey = getSupabaseAnonKey();
+      if (!anonKey) {
+        throw new Error("Supabase is not configured. Check your environment variables.");
+      }
 
-          if (!resp.ok) {
-            const err = await resp.json().catch(() => ({ error: "Parse failed" }));
-            throw new Error(err.error || "Failed to parse PDF");
-          }
+      const resp = await fetch(PARSE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({ pdfBase64: base64 }),
+        signal: controller.signal,
+      });
 
-          const data = await resp.json();
-          if (!data.fields?.length) {
-            setFeedback({
-              open: true,
-              title: "No fields found",
-              description: "No fillable form fields detected in this PDF.",
-              variant: "error",
-            });
-            setStage("upload");
-            return;
-          }
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Parse failed" }));
+        throw new Error(err.error || "Failed to parse PDF");
+      }
 
-          setWalkFields(mapToWalkableFields(data.fields));
-          fillKeyRef.current += 1;
-          setStage("fill");
-          setFeedback({
-            open: true,
-            title: `${data.count} fields detected`,
-            description: "Let's fill them one at a time. Voice or type — your choice.",
-            variant: "success",
-          });
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Failed to parse PDF.";
-          setFeedback({ open: true, title: "Parse failed", description: message, variant: "error" });
-          setStage("preview");
-        }
-      }, 600);
-    } catch {
-      setFeedback({ open: true, title: "Upload failed", description: "Could not read the file.", variant: "error" });
+      const data = await resp.json();
+      if (!data.fields?.length) {
+        setFeedback({
+          open: true,
+          title: "No fields found",
+          description: "This PDF has no fillable form fields. Try a different PDF or use Scribe to build a template.",
+          variant: "error",
+        });
+        setStage("upload");
+        setPdfBase64("");
+        return;
+      }
+
+      setWalkFields(mapToWalkableFields(data.fields));
+      fillKeyRef.current += 1;
+      setStage("fill");
+      setFeedback({
+        open: true,
+        title: `${data.count} fields detected`,
+        description: "Let's fill them one at a time. Voice or type — your choice.",
+        variant: "success",
+      });
+    } catch (err: unknown) {
+      const aborted = err instanceof Error && err.name === "AbortError";
+      if (aborted) {
+        showUploadFailed("Processing took too long — try again or use a smaller file.");
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to process PDF.";
+        showUploadFailed(message);
+      }
       setStage("upload");
+      setPdfBase64("");
+    } finally {
+      window.clearTimeout(timeoutId);
+      abortRef.current = null;
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, []);
 
@@ -193,14 +233,21 @@ export default function PdfFormFill() {
       setFieldValues(values);
       setStage("filling");
       try {
+        const anonKey = getSupabaseAnonKey();
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), PROCESS_TIMEOUT_MS);
+
         const resp = await fetch(FILL_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${anonKey}`,
           },
           body: JSON.stringify({ pdfBase64, fieldValues: values }),
+          signal: controller.signal,
         });
+
+        window.clearTimeout(timeoutId);
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ error: "Fill failed" }));
@@ -226,8 +273,13 @@ export default function PdfFormFill() {
           variant: "success",
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to fill PDF.";
-        setFeedback({ open: true, title: "Fill failed", description: message, variant: "error" });
+        const aborted = err instanceof Error && err.name === "AbortError";
+        const message = aborted
+          ? "Processing took too long — try again or use a smaller file."
+          : err instanceof Error
+            ? err.message
+            : "Failed to fill PDF.";
+        setFeedback({ open: true, title: aborted ? "Upload failed" : "Fill failed", description: message, variant: "error" });
         setStage("fill");
       }
     },
@@ -355,17 +407,17 @@ export default function PdfFormFill() {
   const fieldLabels = Object.fromEntries(walkFields.map((f) => [f.name, f.label]));
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-primary/20 bg-card/60 shrink-0">
-        <div>
-          <h1 className="text-xl font-serif font-bold text-foreground">
+    <div className="flex flex-col h-full min-w-0 max-w-full bg-background overflow-x-hidden">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b border-primary/20 bg-card/60 shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-serif font-bold text-foreground truncate">
             {isTemplateMode ? "Voice Form Filler" : "PDF Form Filler"}
           </h1>
           <p className="text-sm text-muted-foreground">
             Upload, detect fields, fill by voice — one field at a time
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap shrink-0">
           {walkFields.length > 0 && stage !== "upload" && (
             <Button
               variant="outline"
@@ -384,10 +436,10 @@ export default function PdfFormFill() {
       </header>
 
       {stage === "upload" && (
-        <div className="flex-1 flex items-center justify-center p-6">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 min-w-0">
           <div
             className={cn(
-              "w-full max-w-lg border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-colors touch-target",
+              "w-full max-w-lg border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-colors touch-target",
               dragOver
                 ? "border-primary bg-primary/10"
                 : "border-primary/30 hover:border-primary/60 hover:bg-card/50"
@@ -405,12 +457,13 @@ export default function PdfFormFill() {
               Drop your PDF here
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              or tap to upload — fillable PDFs only
+              or tap to upload — fillable PDFs, max 5 MB
             </p>
             <input
+              ref={fileInputRef}
               id="pdf-upload-input"
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,.pdf"
               className="hidden"
               onChange={handleInputChange}
             />
@@ -418,29 +471,28 @@ export default function PdfFormFill() {
         </div>
       )}
 
-      {(stage === "preview" || stage === "parsing") && pdfBase64 && (
-        <div className="flex-1 flex flex-col p-4 sm:p-6 gap-4 max-w-3xl mx-auto w-full">
-          <Card className="overflow-hidden border-primary/30 bg-card">
-            <iframe
-              title="PDF preview"
-              src={`data:application/pdf;base64,${pdfBase64}`}
-              className="w-full h-64 sm:h-80 border-0"
-            />
-          </Card>
-          {stage === "parsing" && (
-            <Card className="p-6 text-center border-primary/30">
-              <FileText className="w-10 h-10 mx-auto mb-3 text-primary animate-pulse" />
-              <p className="font-serif font-medium text-foreground">Detecting form fields…</p>
-              <p className="text-sm text-muted-foreground mt-1">{fileName}</p>
-            </Card>
-          )}
+      {stage === "reading" && (
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <ProcessingIndicator
+            message="Reading your PDF…"
+            submessage={fileName}
+          />
+        </div>
+      )}
+
+      {stage === "parsing" && (
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <ProcessingIndicator
+            message="Processing your document…"
+            submessage={`Detecting form fields in ${fileName}`}
+          />
         </div>
       )}
 
       {stage === "fill" && walkFields.length > 0 && (
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           {pdfBase64 && !isTemplateMode && (
-            <div className="px-4 pt-3 shrink-0 max-w-3xl mx-auto w-full">
+            <div className="hidden md:block px-4 pt-3 shrink-0 max-w-3xl mx-auto w-full">
               <iframe
                 title="PDF preview"
                 src={`data:application/pdf;base64,${pdfBase64}`}
@@ -459,11 +511,8 @@ export default function PdfFormFill() {
       )}
 
       {stage === "filling" && (
-        <div className="flex-1 flex items-center justify-center p-6">
-          <Card className="p-8 text-center max-w-sm border-primary/30">
-            <FileText className="w-10 h-10 mx-auto mb-3 text-primary animate-pulse" />
-            <p className="font-serif font-medium text-foreground">Generating your filled PDF…</p>
-          </Card>
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <ProcessingIndicator message="Generating your filled PDF…" submessage={fileName} />
         </div>
       )}
 

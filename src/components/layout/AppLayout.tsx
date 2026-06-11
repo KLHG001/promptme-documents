@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCheckin } from "@/hooks/useCheckin";
 import { ModeToggle } from "@/components/branding/ModeToggle";
 import { AppFooter } from "@/components/branding/AppFooter";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 function getInitials(profile: { username?: string | null; email?: string | null } | null, email?: string) {
   if (profile?.username) {
@@ -32,10 +33,10 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full max-w-[100vw] overflow-x-hidden bg-background">
         <AppSidebar />
 
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 flex flex-col min-h-screen min-w-0 pb-bottom-nav md:pb-0">
           {/* Top bar - hidden on chat route */}
           {!isChatRoute && (
             <header className="h-12 flex items-center justify-between border-b border-border px-4 bg-card">
@@ -76,12 +77,14 @@ export function AppLayout() {
           )}
 
           {/* Main content */}
-          <main className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0">
             <Outlet />
           </main>
 
-          {!isChatRoute && <AppFooter />}
+          {!isChatRoute && <AppFooter className="hidden md:flex" />}
         </div>
+
+        <MobileBottomNav />
       </div>
     </SidebarProvider>
   );

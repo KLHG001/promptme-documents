@@ -108,6 +108,13 @@
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    @apply overflow-x-hidden;
+    max-width: 100vw;
+  }
+
   * {
     @apply border-border;
   }
@@ -128,5 +135,17 @@
 @layer utilities {
   .touch-target {
     @apply min-h-12 min-w-12;
+  }
+
+  .page-shell {
+    @apply w-full max-w-full min-w-0 px-4 overflow-x-hidden;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pb-bottom-nav {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   }
 }

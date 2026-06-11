@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -26,6 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -276,6 +276,7 @@ export default function SovereignVault() {
   const [dbFiles, setDbFiles] = useState<VaultFile[]>([]);
   const [allDbFiles, setAllDbFiles] = useState<VaultFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadingName, setUploadingName] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewFile, setPreviewFile] = useState<VaultFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -358,15 +359,37 @@ export default function SovereignVault() {
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList?.length) return;
     const file = fileList[0];
+    setUploadingName(file.name);
     setUploadProgress(5);
-    const result = await uploadVaultFile(file, currentFolderPath, setUploadProgress);
+
+    const timeout = new Promise<{ success: false; error: string }>((resolve) => {
+      window.setTimeout(
+        () => resolve({ success: false, error: "Upload timed out — try again or use a smaller file." }),
+        30_000
+      );
+    });
+
+    const result = await Promise.race([
+      uploadVaultFile(file, currentFolderPath, setUploadProgress),
+      timeout,
+    ]);
+
     setUploadProgress(null);
+    setUploadingName(null);
+
     if (result.success) {
       await loadFiles();
       setFeedback({ open: true, title: "Uploaded", description: file.name, variant: "success" });
     } else {
-      setFeedback({ open: true, title: "Upload failed", description: result.error, variant: "error" });
+      setFeedback({
+        open: true,
+        title: "Upload failed",
+        description: result.error ?? "Try again or use a smaller file.",
+        variant: "error",
+      });
     }
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -451,7 +474,7 @@ export default function SovereignVault() {
     : allFiles;
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex h-full min-w-0 max-w-full overflow-hidden bg-background">
       {/* Folder tree */}
       <aside className="hidden md:flex w-56 lg:w-64 flex-col border-r border-primary/20 bg-card/40 shrink-0">
         <div className="p-3 border-b border-primary/20">
@@ -521,10 +544,12 @@ export default function SovereignVault() {
         </div>
 
         {uploadProgress !== null && (
-          <div className="shrink-0 space-y-1">
-            <p className="text-xs text-muted-foreground">Uploading… {uploadProgress}%</p>
-            <Progress value={uploadProgress} className="h-2" />
-          </div>
+          <ProcessingIndicator
+            compact
+            message="Uploading to Vault…"
+            submessage={uploadingName ?? undefined}
+            progress={uploadProgress}
+          />
         )}
 
         <div

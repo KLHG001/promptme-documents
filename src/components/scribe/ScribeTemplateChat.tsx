@@ -10,7 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ChatMessage } from "@/hooks/useInterrogator";
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/interrogator-chat`;
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabaseEnv";
+
+const CHAT_URL = `${getSupabaseUrl()}/functions/v1/interrogator-chat`;
 
 const WELCOME =
   "I'm the Scribe. Describe the document template you need — fields, purpose, who it's for — and I'll draft a reusable template for you.";
@@ -92,7 +94,7 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${getSupabaseAnonKey()}`,
           },
           body: JSON.stringify({ messages: apiMessages }),
           signal: controller.signal,

@@ -12,6 +12,7 @@ import { ModeToggle } from "@/components/branding/ModeToggle";
 import { AppFooter } from "@/components/branding/AppFooter";
 import { SaveToVaultDialog } from "@/components/vault/SaveToVaultDialog";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
 import { KnowledgeHarvestDialog } from "@/components/interrogator/KnowledgeHarvestDialog";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -117,7 +118,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full min-w-0 max-w-full bg-background overflow-x-hidden">
       {/* Concierge header */}
       <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card/60 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -155,6 +156,16 @@ export default function Chat() {
           <ChatWindow messages={[]} isTyping={isTyping} showAvatars={false} />
         )}
 
+        {isTyping && (
+          <div className="px-4 py-2 shrink-0 border-t border-primary/10 bg-card/40">
+            <ProcessingIndicator
+              compact
+              message="The Interrogator is drafting…"
+              submessage="Processing your document…"
+            />
+          </div>
+        )}
+
         {showDocumentActions && (
           <DocumentActions
             onSaveVault={() => setVaultDialogOpen(true)}
@@ -186,6 +197,12 @@ export default function Chat() {
         </Button>
         <AppFooter />
       </div>
+
+      {saving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
+          <ProcessingIndicator message="Saving to Vault…" />
+        </div>
+      )}
 
       <SaveToVaultDialog
         open={vaultDialogOpen}

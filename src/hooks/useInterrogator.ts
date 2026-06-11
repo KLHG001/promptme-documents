@@ -6,6 +6,7 @@ import {
   formatIdentityForPrompt,
   type UserIdentityVoice,
 } from "@/lib/masterVault/identity";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabaseEnv";
 
 export interface ChatMessage {
   id: string;
@@ -15,7 +16,7 @@ export interface ChatMessage {
   isError?: boolean;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/interrogator-chat`;
+const CHAT_URL = `${getSupabaseUrl()}/functions/v1/interrogator-chat`;
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
@@ -105,7 +106,7 @@ export function useInterrogator() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${getSupabaseAnonKey()}`,
           },
           body: JSON.stringify({
             messages: apiMessages,

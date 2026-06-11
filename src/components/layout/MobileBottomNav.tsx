@@ -27,7 +27,7 @@ export function MobileBottomNav() {
             key={item.url}
             to={item.url}
             end={item.end}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[3rem] min-w-0 px-1 py-2 text-[10px] font-medium text-muted-foreground transition-colors touch-target"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-12 min-w-0 px-1 py-2 text-[10px] font-medium text-muted-foreground transition-colors touch-target"
             activeClassName="text-primary"
           >
             <item.icon className="h-5 w-5 shrink-0" />

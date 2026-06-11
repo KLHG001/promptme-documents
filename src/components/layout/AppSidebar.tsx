@@ -16,6 +16,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -32,6 +33,7 @@ const navItems = [
 export function AppSidebar() {
   const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
+  const showLabels = isMobile || !collapsed;
   const location = useLocation();
 
   const handleNavClick = () => {
@@ -46,7 +48,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2.5">
           <PmiLogo size="sm" />
-          {!collapsed && (
+          {showLabels && (
             <div className="min-w-0">
               <span className="font-serif font-bold text-base text-foreground tracking-tight block leading-tight">
                 PromptMe Docs
@@ -61,21 +63,36 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{showLabels ? "Navigation" : ""}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                    size="lg"
+                    className={cn(!showLabels && "flex-col h-auto min-h-12 py-2 gap-1")}
+                  >
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="hover:bg-sidebar-accent/50 min-h-12"
+                      className={cn(
+                        "hover:bg-sidebar-accent/50 min-h-12",
+                        !showLabels && "flex-col items-center justify-center gap-1 py-2"
+                      )}
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                       onClick={handleNavClick}
                     >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className={cn("h-4 w-4 shrink-0", showLabels && "mr-2")} />
+                      <span
+                        className={cn(
+                          showLabels ? "truncate" : "text-[10px] leading-tight text-center w-full px-1"
+                        )}
+                      >
+                        {item.title}
+                      </span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -86,7 +103,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4">
-        {!collapsed && (
+        {showLabels && (
           <>
             <p className="text-xs text-muted-foreground mb-2">PromptMe Documents v0.2</p>
             <AppFooter className="!py-0 !px-0 text-left" />

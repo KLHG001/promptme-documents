@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, SkipForward } from "lucide-react";
+import { ArrowUp, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,6 @@ import { VoiceMicButton } from "./VoiceMicButton";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { useFieldWalker, type WalkableField } from "@/hooks/useFieldWalker";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
-import { cn } from "@/lib/utils";
 
 interface FieldWalkerProps {
   fields: WalkableField[];
@@ -121,15 +120,24 @@ export function FieldWalker({ fields, title, onComplete, encouragement }: FieldW
               Options: {field.options.join(", ")}
             </p>
           ) : null}
+          <p className="text-[11px] text-center text-muted-foreground mt-3">
+            &quot;Undecided&quot; or &quot;Skip&quot; are always valid
+          </p>
         </div>
+      </div>
 
-        <div className="w-full space-y-3">
+      <div className="shrink-0 border-t border-border bg-card/80 px-3 py-3 pb-safe">
+        <div className="flex items-end gap-2 max-w-lg mx-auto w-full">
+          <VoiceMicButton
+            isListening={isListening}
+            onClick={toggle}
+            className="h-12 w-12 flex-shrink-0 shadow-md shadow-primary/20"
+            iconClassName="h-5 w-5"
+          />
+
           {isSelect && field.options?.length ? (
-            <Select
-              value={walker.inputValue}
-              onValueChange={walker.setInputValue}
-            >
-              <SelectTrigger className="touch-target h-12 text-base border-primary/40">
+            <Select value={walker.inputValue} onValueChange={walker.setInputValue}>
+              <SelectTrigger className="touch-target h-12 flex-1 text-base border-primary/40 min-w-0">
                 <SelectValue placeholder="Choose an option…" />
               </SelectTrigger>
               <SelectContent>
@@ -145,37 +153,33 @@ export function FieldWalker({ fields, title, onComplete, encouragement }: FieldW
               value={walker.inputValue}
               onChange={(e) => walker.setInputValue(e.target.value)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}…`}
-              className="touch-target h-12 text-base border-primary/40"
+              className="touch-target h-12 flex-1 text-base border-primary/40 min-w-0"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleConfirm();
               }}
             />
           )}
-          <p className="text-[11px] text-center text-muted-foreground">
-            &quot;Undecided&quot; or &quot;Skip&quot; are always valid
-          </p>
+
+          <Button
+            type="button"
+            size="icon"
+            className="touch-target h-12 w-12 rounded-full flex-shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={handleConfirm}
+            aria-label="Confirm value"
+          >
+            <ArrowUp className="h-5 w-5" />
+          </Button>
         </div>
 
-        <VoiceMicButton
-          isListening={isListening}
-          onClick={toggle}
-        />
-
-        <div className={cn("flex gap-3 w-full max-w-sm")}>
+        <div className="flex justify-center mt-2 max-w-lg mx-auto">
           <Button
-            variant="outline"
-            className="touch-target h-12 flex-1 gap-2 rounded-full border-muted-foreground/30"
+            variant="ghost"
+            size="sm"
+            className="touch-target h-12 gap-2 text-muted-foreground"
             onClick={handleSkip}
           >
             <SkipForward className="h-4 w-4" />
-            Skip
-          </Button>
-          <Button
-            className="touch-target h-12 flex-1 gap-2 rounded-full"
-            onClick={handleConfirm}
-          >
-            Confirm
-            <ArrowRight className="h-4 w-4" />
+            Skip field
           </Button>
         </div>
       </div>

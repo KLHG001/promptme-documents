@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useInterrogator } from "@/hooks/useInterrogator";
@@ -26,9 +26,12 @@ const WELCOME =
 
 export default function Chat() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionParam = searchParams.get("session");
   const { user } = useAuth();
   const { setOpen, setOpenMobile } = useSidebar();
-  const { messages, isTyping, sendMessage, sessionId } = useInterrogator();
+  const { messages, isTyping, sendMessage, loadSession, sessionId } = useInterrogator();
+  const loadedSessionRef = useRef<string | null>(null);
 
   const [hasSentMessage, setHasSentMessage] = useState(false);
   const [vaultDialogOpen, setVaultDialogOpen] = useState(false);
@@ -47,6 +50,15 @@ export default function Chat() {
     setOpen(false);
     setOpenMobile(false);
   }, [setOpen, setOpenMobile]);
+
+  useEffect(() => {
+    if (!sessionParam || loadedSessionRef.current === sessionParam) return;
+
+    loadedSessionRef.current = sessionParam;
+    loadSession(sessionParam).then((ok) => {
+      if (ok) setHasSentMessage(true);
+    });
+  }, [sessionParam, loadSession]);
 
   const documentContent = useMemo(() => {
     if (isTyping || messages.length === 0) return null;
@@ -185,6 +197,7 @@ export default function Chat() {
             disabled={isTyping}
             placeholder="Speak or type what you need…"
             voicePrimary
+            className="pl-14"
           />
         </div>
         <Button

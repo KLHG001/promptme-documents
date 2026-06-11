@@ -224,6 +224,37 @@ export function useInterrogator() {
     setIsTyping(false);
   }, []);
 
+  const loadSession = useCallback(
+    async (id: string) => {
+      if (!user) return false;
+
+      abortRef.current?.abort();
+      setIsTyping(false);
+
+      const { data, error } = await supabase
+        .from("chat_sessions")
+        .select("id, messages")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (error || !data) return false;
+
+      const msgs = ((data.messages as any[]) ?? []).map((m: any) => ({
+        id: m.id ?? makeId(),
+        role: m.role as "assistant" | "user",
+        content: m.content ?? "",
+        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        isError: m.isError,
+      }));
+
+      setMessages(msgs);
+      setSessionId(data.id);
+      return true;
+    },
+    [user]
+  );
+
   const markCompleted = useCallback(async () => {
     if (!sessionId) return;
     await supabase
@@ -237,6 +268,7 @@ export function useInterrogator() {
     isTyping,
     sendMessage,
     reset,
+    loadSession,
     sessionId,
     markCompleted,
     identityVoice,

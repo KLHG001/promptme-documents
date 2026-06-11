@@ -9,9 +9,18 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   voicePrimary?: boolean;
+  showAttachment?: boolean;
+  className?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder, voicePrimary }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  placeholder,
+  voicePrimary,
+  showAttachment = true,
+  className,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -173,7 +182,7 @@ export function ChatInput({ onSend, disabled, placeholder, voicePrimary }: ChatI
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-3 pl-14">
+      <form onSubmit={handleSubmit} className={cn("flex flex-col gap-2 p-3", className)}>
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-1">
             {attachedFiles.map((file, i) => (
@@ -195,40 +204,26 @@ export function ChatInput({ onSend, disabled, placeholder, voicePrimary }: ChatI
           </div>
         )}
 
-        <div className={cn("flex items-end gap-2", voicePrimary && "flex-row-reverse")}>
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            <Button
-              type="button"
-              variant={voicePrimary ? "default" : "ghost"}
-              size="icon"
-              className={cn(
-                "touch-target h-12 w-12 rounded-full transition-colors",
-                isListening
-                  ? "bg-destructive/15 text-destructive hover:bg-destructive/25 animate-pulse"
-                  : voicePrimary
-                    ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-              )}
-              onClick={toggleListening}
-              disabled={disabled}
-              title={isListening ? "Stop listening" : "Voice input"}
-              aria-label={isListening ? "Stop listening" : "Voice input"}
-            >
-              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="touch-target h-12 w-12 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={handleFileSelect}
-              disabled={disabled}
-              title="Attach files"
-              aria-label="Attach files"
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
-          </div>
+        <div className="flex items-end gap-2">
+          <Button
+            type="button"
+            variant={voicePrimary ? "default" : "ghost"}
+            size="icon"
+            className={cn(
+              "touch-target h-12 w-12 rounded-full flex-shrink-0 transition-colors",
+              isListening
+                ? "bg-destructive/15 text-destructive hover:bg-destructive/25 animate-pulse"
+                : voicePrimary
+                  ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+            )}
+            onClick={toggleListening}
+            disabled={disabled}
+            title={isListening ? "Stop listening" : "Voice input"}
+            aria-label={isListening ? "Stop listening" : "Voice input"}
+          >
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </Button>
 
           <textarea
             ref={inputRef}
@@ -248,6 +243,21 @@ export function ChatInput({ onSend, disabled, placeholder, voicePrimary }: ChatI
             style={{ maxHeight: 200 }}
           />
 
+          {showAttachment && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="touch-target h-12 w-12 rounded-full flex-shrink-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+              onClick={handleFileSelect}
+              disabled={disabled}
+              title="Attach files"
+              aria-label="Attach files"
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+          )}
+
           <Button
             type="submit"
             size="icon"
@@ -260,14 +270,16 @@ export function ChatInput({ onSend, disabled, placeholder, voicePrimary }: ChatI
         </div>
       </form>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
-        onChange={handleFilesChanged}
-        className="hidden"
-      />
+      {showAttachment && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
+          onChange={handleFilesChanged}
+          className="hidden"
+        />
+      )}
 
       <FeedbackModal
         open={micError.open}

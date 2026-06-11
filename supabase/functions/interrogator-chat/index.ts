@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 const BASE_SYSTEM_PROMPT = `You are the Interrogator — a sharp, professional AI agent embedded in PromptMe, a "Street to Suite" business platform. Your job is to dynamically build forms and collect structured data from users through natural conversation.

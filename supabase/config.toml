@@ -1,0 +1,13 @@
+project_id = "dembqefiyfcctjqiepij"
+
+[functions.interrogator-chat]
+verify_jwt = false
+
+[functions.scribe-generate]
+verify_jwt = false
+
+[functions.pdf-parse-fields]
+verify_jwt = false
+
+[functions.pdf-fill-fields]
+verify_jwt = false

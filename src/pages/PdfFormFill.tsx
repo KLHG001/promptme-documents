@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
-import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
+import { ProgressOverlay } from "@/components/feedback/ProgressIndicator";
 import { SaveToVaultDialog } from "@/components/vault/SaveToVaultDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +25,8 @@ type Stage = "upload" | "reading" | "parsing" | "fill" | "filling" | "done";
 const PARSE_URL = `${getSupabaseUrl()}/functions/v1/pdf-parse-fields`;
 const FILL_URL = `${getSupabaseUrl()}/functions/v1/pdf-fill-fields`;
 const MAX_PDF_BYTES = 5 * 1024 * 1024;
-const PROCESS_TIMEOUT_MS = 30_000;
+const STILL_WORKING_MS = 90_000;
+const PROCESS_TIMEOUT_MS = 180_000;
 
 interface LocationState {
   templateFields?: Array<{
@@ -70,15 +71,24 @@ export default function PdfFormFill() {
   const [savingVault, setSavingVault] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [isTemplateMode, setIsTemplateMode] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [processingHint, setProcessingHint] = useState<"uploading" | "detecting" | "almost_done">("uploading");
+  const [stillWorkingOpen, setStillWorkingOpen] = useState(false);
   const [feedback, setFeedback] = useState<{
     open: boolean;
     title: string;
     description?: string;
     variant?: "success" | "error" | "info";
+    confirmLabel?: string;
+    onConfirm?: () => void;
   }>({ open: false, title: "" });
   const fillKeyRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastFileRef = useRef<File | null>(null);
+  const handleFileRef = useRef<(file: File) => Promise<void>>(async () => {});
+  const stillWorkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const almostDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (locationState?.templateFields?.length) {
@@ -108,14 +118,58 @@ export default function PdfFormFill() {
       reader.readAsDataURL(file);
     });
 
+  const clearProcessingTimers = () => {
+    if (stillWorkingTimerRef.current) {
+      window.clearTimeout(stillWorkingTimerRef.current);
+      stillWorkingTimerRef.current = null;
+    }
+    if (almostDoneTimerRef.current) {
+      window.clearTimeout(almostDoneTimerRef.current);
+      almostDoneTimerRef.current = null;
+    }
+    setStillWorkingOpen(false);
+    setUploadProgress(null);
+  };
+
+  const startProcessingTimers = () => {
+    clearProcessingTimers();
+    stillWorkingTimerRef.current = window.setTimeout(() => {
+      setStillWorkingOpen(true);
+    }, STILL_WORKING_MS);
+    almostDoneTimerRef.current = window.setTimeout(() => {
+      setProcessingHint("almost_done");
+    }, 12_000);
+  };
+
   const showUploadFailed = (description?: string) => {
     setFeedback({
       open: true,
       title: "Upload failed",
       description: description ?? "Try again or use a smaller file (under 5 MB).",
       variant: "error",
+      confirmLabel: "Try again",
+      onConfirm: () => {
+        if (lastFileRef.current) {
+          void handleFileRef.current(lastFileRef.current);
+        } else {
+          fileInputRef.current?.click();
+        }
+      },
     });
   };
+
+  const processingMessage =
+    stage === "reading"
+      ? "Uploading…"
+      : stage === "parsing"
+        ? processingHint === "almost_done"
+          ? "Almost done…"
+          : "Detecting fields…"
+        : stage === "filling"
+          ? "Generating your filled PDF…"
+          : "Analyzing your document…";
+
+  const isProcessing = stage === "reading" || stage === "parsing" || stage === "filling";
 
   const handleFile = useCallback(async (file: File) => {
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -137,13 +191,18 @@ export default function PdfFormFill() {
     abortRef.current = controller;
     const timeoutId = window.setTimeout(() => controller.abort(), PROCESS_TIMEOUT_MS);
 
+    lastFileRef.current = file;
     setFileName(file.name);
     setTemplateName(file.name.replace(/\.pdf$/i, ""));
+    setProcessingHint("uploading");
     setStage("reading");
+    startProcessingTimers();
 
     try {
-      const base64 = await readFileAsBase64(file);
+      const base64 = await readFileAsBase64(file, setUploadProgress);
       setPdfBase64(base64);
+      setUploadProgress(null);
+      setProcessingHint("detecting");
       setStage("parsing");
 
       const anonKey = getSupabaseAnonKey();
@@ -200,10 +259,13 @@ export default function PdfFormFill() {
       setPdfBase64("");
     } finally {
       window.clearTimeout(timeoutId);
+      clearProcessingTimers();
       abortRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, []);
+
+  handleFileRef.current = handleFile;
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -232,6 +294,7 @@ export default function PdfFormFill() {
       }
       setFieldValues(values);
       setStage("filling");
+      startProcessingTimers();
       try {
         const anonKey = getSupabaseAnonKey();
         const controller = new AbortController();
@@ -279,8 +342,17 @@ export default function PdfFormFill() {
           : err instanceof Error
             ? err.message
             : "Failed to fill PDF.";
-        setFeedback({ open: true, title: aborted ? "Upload failed" : "Fill failed", description: message, variant: "error" });
+        setFeedback({
+          open: true,
+          title: aborted ? "Upload failed" : "Fill failed",
+          description: message,
+          variant: "error",
+          confirmLabel: "Try again",
+          onConfirm: () => fillPdf(values),
+        });
         setStage("fill");
+      } finally {
+        clearProcessingTimers();
       }
     },
     [pdfBase64, user, fileName]
@@ -471,22 +543,16 @@ export default function PdfFormFill() {
         </div>
       )}
 
-      {stage === "reading" && (
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-          <ProcessingIndicator
-            message="Reading your PDF…"
-            submessage={fileName}
-          />
-        </div>
-      )}
-
-      {stage === "parsing" && (
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-          <ProcessingIndicator
-            message="Processing your document…"
-            submessage={`Detecting form fields in ${fileName}`}
-          />
-        </div>
+      {isProcessing && (
+        <ProgressOverlay
+          message={processingMessage}
+          submessage={
+            fileName
+              ? `Analyzing your document… · ${fileName}`
+              : "Analyzing your document…"
+          }
+          progress={stage === "reading" ? uploadProgress : null}
+        />
       )}
 
       {stage === "fill" && walkFields.length > 0 && (
@@ -507,12 +573,6 @@ export default function PdfFormFill() {
             onComplete={handleFieldsComplete}
             encouragement={fieldEncouragement}
           />
-        </div>
-      )}
-
-      {stage === "filling" && (
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-          <ProcessingIndicator message="Generating your filled PDF…" submessage={fileName} />
         </div>
       )}
 
@@ -613,11 +673,22 @@ export default function PdfFormFill() {
       />
 
       <FeedbackModal
+        open={stillWorkingOpen}
+        onOpenChange={setStillWorkingOpen}
+        title="Still working"
+        description="Large documents take longer. We're analyzing your PDF — hang tight."
+        variant="info"
+        confirmLabel="OK"
+      />
+
+      <FeedbackModal
         open={feedback.open}
         onOpenChange={(open) => setFeedback((f) => ({ ...f, open }))}
         title={feedback.title}
         description={feedback.description}
         variant={feedback.variant}
+        confirmLabel={feedback.confirmLabel}
+        onConfirm={feedback.onConfirm}
       />
     </div>
   );

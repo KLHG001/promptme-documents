@@ -23,7 +23,7 @@ import { FieldWalker, fieldEncouragement } from "@/components/fields/FieldWalker
 import { ScribeTemplateChat } from "@/components/scribe/ScribeTemplateChat";
 import type { WalkableField } from "@/hooks/useFieldWalker";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
-import { ProcessingIndicator } from "@/components/feedback/ProcessingIndicator";
+import { ProgressOverlay } from "@/components/feedback/ProgressIndicator";
 import { SaveToVaultDialog } from "@/components/vault/SaveToVaultDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -415,9 +415,7 @@ export default function DocumentGeneration() {
         </Card>
 
         {savingVault && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
-            <ProcessingIndicator message="Saving to Vault…" submessage={activeTemplate?.name} />
-          </div>
+          <ProgressOverlay message="Saving to Vault…" submessage={activeTemplate?.name} />
         )}
 
         <SaveToVaultDialog

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChatWindow } from "@/components/interrogator/ChatWindow";
 import { ChatInput } from "@/components/interrogator/ChatInput";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { ProgressOverlay } from "@/components/feedback/ProgressIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ChatMessage } from "@/hooks/useInterrogator";
@@ -41,6 +42,8 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
   const [hasSent, setHasSent] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -60,10 +63,53 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
     }
   }, [initialContext]);
 
+  const readFileAsText = (file: File, onProgress?: (pct: number) => void): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      reader.onload = () => resolve((reader.result as string).slice(0, 8000));
+      reader.onerror = () => reject(new Error("Could not read the file."));
+      reader.readAsText(file);
+    });
+
   const sendMessage = useCallback(
-    async (input: string) => {
-      const trimmed = input.trim();
-      if (!trimmed || isTyping) return;
+    async (input: string, files?: File[]) => {
+      let trimmed = input.trim();
+      if ((!trimmed && !files?.length) || isTyping || generating || uploading) return;
+
+      let fileContext = "";
+      if (files?.length) {
+        setUploading(true);
+        setUploadProgress(0);
+        try {
+          const parts: string[] = [];
+          for (const file of files.slice(0, 3)) {
+            const text = await readFileAsText(file, setUploadProgress);
+            parts.push(`[Attached: ${file.name}]\n${text}`);
+          }
+          fileContext = parts.join("\n\n");
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : "Upload failed";
+          setFeedback({ open: true, title: "Upload failed", description: message, variant: "error" });
+          setUploading(false);
+          setUploadProgress(null);
+          return;
+        } finally {
+          setUploading(false);
+          setUploadProgress(null);
+        }
+      }
+
+      if (!trimmed && fileContext) {
+        trimmed = "Please use the attached file(s) to help draft this template.";
+      }
+      if (!trimmed) return;
+
+      const content = fileContext ? `${trimmed}\n\n${fileContext}` : trimmed;
 
       setHasSent(true);
       const userMsg: ChatMessage = {
@@ -78,9 +124,9 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
 
       const apiMessages = [
         { role: "system" as const, content: SYSTEM_PROMPT },
-        ...updated.map((m) => ({
+        ...updated.map((m, i) => ({
           role: m.role as "user" | "assistant",
-          content: m.content,
+          content: i === updated.length - 1 && m.role === "user" ? content : m.content,
         })),
       ];
 
@@ -159,7 +205,7 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
         abortRef.current = null;
       }
     },
-    [messages, isTyping]
+    [messages, isTyping, generating, uploading]
   );
 
   const handleDraftTemplate = async () => {
@@ -292,11 +338,33 @@ export function ScribeTemplateChat({ onCancel, onSaved, initialContext }: Scribe
         )}
         <ChatInput
           onSend={sendMessage}
-          disabled={isTyping || generating}
+          disabled={isTyping || generating || uploading}
           placeholder="Describe your template needs…"
           voicePrimary
         />
       </div>
+
+      {uploading && (
+        <ProgressOverlay
+          message="Uploading…"
+          submessage="Reading your file for template creation"
+          progress={uploadProgress}
+        />
+      )}
+
+      {generating && (
+        <ProgressOverlay
+          message="Generating your document…"
+          submessage="The Scribe is drafting your template fields"
+        />
+      )}
+
+      {saving && (
+        <ProgressOverlay
+          message="Saving template…"
+          submessage={preview?.name as string | undefined}
+        />
+      )}
 
       <FeedbackModal
         open={feedback.open}

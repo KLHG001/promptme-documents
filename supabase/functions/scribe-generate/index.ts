@@ -6,11 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+const ANTHROPIC_VERSION = "2023-06-01";
+
 const SYSTEM_PROMPT = `You are the Scribe — a document template architect. Given a set of keywords, a document name, and optional context, you generate a structured document template with fields that would be needed to create that document.
 
-## Output Format (strict JSON via tool call)
+## Output Format
 
-Return a template object with:
+Use the create_template tool to return a template object with:
 - name: The document title
 - description: A one-sentence description of what this document does
 - category: One of: Notice, Resolution, Legal, Finance, Business, HR, Custom
@@ -30,6 +34,39 @@ Return a template object with:
 - Always include a date field and a notes/comments field
 - For financial documents, include currency fields`;
 
+const CREATE_TEMPLATE_TOOL = {
+  name: "create_template",
+  description: "Create a structured document template",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Document template name" },
+      description: { type: "string", description: "One-sentence description" },
+      category: {
+        type: "string",
+        enum: ["Notice", "Resolution", "Legal", "Finance", "Business", "HR", "Custom"],
+      },
+      fields: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            type: { type: "string", enum: ["text", "number", "date", "select", "currency"] },
+            question: { type: "string" },
+            placeholder: { type: "string" },
+            options: { type: "array", items: { type: "string" } },
+          },
+          required: ["id", "label", "type", "question"],
+        },
+      },
+      completionMessage: { type: "string" },
+    },
+    required: ["name", "description", "category", "fields", "completionMessage"],
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,70 +74,29 @@ serve(async (req) => {
 
   try {
     const { keywords, name, context } = await req.json();
-    const AI_API_KEY = Deno.env.get("AI_API_KEY");
-    if (!AI_API_KEY) throw new Error("AI_API_KEY is not configured");
-
-    const AI_API_URL =
-      Deno.env.get("AI_API_URL") ?? "https://openrouter.ai/api/v1/chat/completions";
-    const AI_MODEL = Deno.env.get("AI_MODEL") ?? "google/gemini-2.0-flash-001";
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const prompt = `Create a document template for: "${name || keywords}".
 Keywords: ${Array.isArray(keywords) ? keywords.join(", ") : keywords}
 ${context ? `Additional context: ${context}` : ""}`;
 
-    const response = await fetch(AI_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${AI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: AI_MODEL,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: prompt },
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "create_template",
-                description: "Create a structured document template",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Document template name" },
-                    description: { type: "string", description: "One-sentence description" },
-                    category: {
-                      type: "string",
-                      enum: ["Notice", "Resolution", "Legal", "Finance", "Business", "HR", "Custom"],
-                    },
-                    fields: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          id: { type: "string" },
-                          label: { type: "string" },
-                          type: { type: "string", enum: ["text", "number", "date", "select", "currency"] },
-                          question: { type: "string" },
-                          placeholder: { type: "string" },
-                          options: { type: "array", items: { type: "string" } },
-                        },
-                        required: ["id", "label", "type", "question"],
-                      },
-                    },
-                    completionMessage: { type: "string" },
-                  },
-                  required: ["name", "description", "category", "fields", "completionMessage"],
-                },
-              },
-            },
-          ],
-          tool_choice: { type: "function", function: { name: "create_template" } },
-        }),
-      }
-    );
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: prompt }],
+        tools: [CREATE_TEMPLATE_TOOL],
+        tool_choice: { type: "tool", name: "create_template" },
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -109,14 +105,14 @@ ${context ? `Additional context: ${context}` : ""}`;
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 529) {
         return new Response(
           JSON.stringify({ error: "AI quota exceeded. Please check your API billing." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("Anthropic API error:", response.status, t);
       return new Response(
         JSON.stringify({ error: "AI service error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -124,17 +120,19 @@ ${context ? `Additional context: ${context}` : ""}`;
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall?.function?.arguments) {
+    const toolUse = data.content?.find(
+      (block: { type: string; name?: string; input?: unknown }) =>
+        block.type === "tool_use" && block.name === "create_template"
+    );
+
+    if (!toolUse?.input) {
       return new Response(
         JSON.stringify({ error: "Failed to generate template structure" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const template = JSON.parse(toolCall.function.arguments);
-
-    return new Response(JSON.stringify({ template }), {
+    return new Response(JSON.stringify({ template: toolUse.input }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

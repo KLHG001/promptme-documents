@@ -27,9 +27,7 @@ The dev server runs at [http://localhost:8080](http://localhost:8080).
 | `VITE_SUPABASE_PROJECT_ID` | `.env` | Operational project ref |
 | `VITE_MASTERVAULT_SUPABASE_URL` | `.env` | MasterVault URL (optional; defaults to operational) |
 | `VITE_MASTERVAULT_SUPABASE_PUBLISHABLE_KEY` | `.env` | MasterVault anon key (optional) |
-| `AI_API_KEY` | Supabase secrets | API key for chat/template edge functions |
-| `AI_API_URL` | Supabase secrets | OpenAI-compatible chat completions endpoint |
-| `AI_MODEL` | Supabase secrets | Model identifier (default: `google/gemini-2.0-flash-001`) |
+| `ANTHROPIC_API_KEY` | Supabase secrets | Anthropic API key for `interrogator-chat` and `scribe-generate` |
 
 ## Scripts
 
@@ -53,5 +51,5 @@ All MasterVault writes use `app_source = "promptme-docs"`. Edge functions live i
 To set AI secrets for edge functions:
 
 ```sh
-supabase secrets set AI_API_KEY=your_key
+supabase secrets set ANTHROPIC_API_KEY=your_key
 ```
